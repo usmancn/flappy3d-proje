@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Flappy - Platform Optimize</title>
+
+    <!-- Harici CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Kütüphaneler (aynen bıraktım) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <div id="info">
+        <h2 style="margin-top:0">🎮 3D FLAPPY BIRD</h2>
+        <p>Klasik Flappy Bird mekaniği!</p>
+        <p>1. <span class="highlight">YÖN:</span> İmleci Sağa/Sola götür.</p>
+        <p>2. <span class="highlight">ZIPLA:</span> Pinch (Çimdik) yap!</p>
+        <p style="margin-top:10px; font-size:14px; opacity:0.8;">💡 Tıkla → Zıpla → Düş → Tekrar Tıkla</p>
+        <p style="margin-top:15px; font-size:24px">Skor: <span id="scoreVal" class="highlight">0</span></p>
+    </div>
+
+    <div id="fps">FPS: <span id="fpsVal">60</span></div>
+    <div id="game-cursor"></div>
+    <div id="game-cursor"></div>
+    <div id="status-display"></div>
+
+    <div id="gameOverScreen">
+        <h1 style="font-size: 60px; margin: 0; color: #e74c3c;">KAZA!</h1>
+        <p style="font-size: 30px;">Skorun: <span id="finalScore">0</span></p>
+        <button onclick="resetGame()">TEKRAR DENE</button>
+    </div>
+
+    <div id="control-layer">
+        <canvas id="output_canvas" width="320" height="240"></canvas>
+    </div>
+    <video id="webcam" playsinline></video>
+
+    <div id="game-container"></div>
+
+    <!-- Tüm oyun kodun buraya taşındı -->
+    <script src="js/globals.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/gameLogic.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/loop.js"></script>
+    <script src="js/boot.js"></script>
+
+</body>
+
+</html>
