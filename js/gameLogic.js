@@ -247,6 +247,11 @@ function updateGame(dt) {
                     score++;
                     document.getElementById('scoreVal').innerText = score;
                     p.passed = true;
+                    
+                    // Maksimum skor 30'a ulaştığında oyunu bitir
+                    if (score >= 30) {
+                        gameOver();
+                    }
                 }
 
                 if (Math.abs(p.z - bird.position.z) < 1.0) {
@@ -339,6 +344,16 @@ function updateGame(dt) {
             gameActive = false;
             document.getElementById('gameOverScreen').style.display = 'block';
             document.getElementById('finalScore').innerText = score;
+            
+            // Kazandı mı yoksa kaybetti mi?
+            const gameOverTitle = document.querySelector('#gameOverScreen h1');
+            if (score >= 30) {
+                gameOverTitle.textContent = '🎉 KAZANDIN!';
+                gameOverTitle.style.color = '#27ae60';
+            } else {
+                gameOverTitle.textContent = 'KAZA!';
+                gameOverTitle.style.color = '#e74c3c';
+            }
         }
 
         window.resetGame = function () {
