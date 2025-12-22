@@ -88,6 +88,30 @@ function updateGame(dt) {
             bird.rotation.y += (targetRotY - bird.rotation.y) * rotSmooth;
             bird.rotation.z += (targetRotZ - bird.rotation.z) * rotSmooth;
 
+            // GLTF animasyonları güncelle (eğer varsa)
+            if (bird.userData.mixer) {
+                bird.userData.mixer.update(dtSeconds);
+            }
+            
+            // Kanat animasyonu (Flappy Bird tarzı - fallback)
+            // Eğer GLTF animasyonu yoksa manuel kanat çırpma
+            if (bird.userData.wingL && bird.userData.wingR && !bird.userData.mixer) {
+                // Hız ve zaman bazlı kanat çırpma
+                const wingSpeed = Math.abs(birdVelocityY) * 2 + 3; // Hız arttıkça daha hızlı çırp
+                const wingAngle = Math.sin(Date.now() * 0.01 * wingSpeed) * 0.8; // -0.8 ile 0.8 arası
+                
+                // Kanatları çırp (z ekseni rotasyonu)
+                bird.userData.wingL.rotation.z = -0.3 - wingAngle;
+                bird.userData.wingR.rotation.z = 0.3 + wingAngle;
+                
+                // Zıplama anında daha güçlü çırp
+                if (birdVelocityY > 5) {
+                    const jumpBoost = Math.min(0.5, birdVelocityY * 0.1);
+                    bird.userData.wingL.rotation.z -= jumpBoost;
+                    bird.userData.wingR.rotation.z += jumpBoost;
+                }
+            }
+
             // Kamera takibi
             const cameraOffsetZ = 15;
             const cameraTargetZ = bird.position.z + cameraOffsetZ;
@@ -110,6 +134,7 @@ function updateGame(dt) {
             // LookAt de yolu takip etmeli
             camera.lookAt(targetLookAtX, 0, lookAtZ);
 
+            
             if (bird.position.y < -2) gameOver();
 
             if (lastRoadZ > bird.position.z - 100) {
@@ -248,9 +273,10 @@ function updateGame(dt) {
                     document.getElementById('scoreVal').innerText = score;
                     p.passed = true;
                     
+                    // TEST MODU: Maksimum skor kontrolü kapalı
                     // Maksimum skor 30'a ulaştığında oyunu bitir
-                    if (score >= 30) {
-                        gameOver();
+                     if (score >= 30) {
+                         gameOver();
                     }
                 }
 
@@ -261,11 +287,13 @@ function updateGame(dt) {
                         const dx = Math.abs(currentBirdOffset - p.offset);
 
                         if (dx > corridorHalfWidth) {
+                            
                             gameOver();
                         } else {
                             const gapTop = p.yCenter + PIPE_GAP_Y / 2;
                             const gapBottom = p.yCenter - PIPE_GAP_Y / 2;
                             const hitY = (bird.position.y + 0.4 > gapTop) || (bird.position.y - 0.4 < gapBottom);
+                            
                             if (hitY) gameOver();
                         }
                     }
@@ -283,12 +311,10 @@ function updateGame(dt) {
             }
 
             if (lastCloudZ > bird.position.z - 100) {
-        createCloud();
-    }
+                createCloud();
+            }
 
    // --- GÜNCELLENMİŞ BULUT DÖNGÜSÜ (Fade + Hareket + Silme) ---
-    // updateGame fonksiyonunun en altındaki for döngüsünü bununla değiştir:
-    
     for (let i = clouds.length - 1; i >= 0; i--) {
         const cloud = clouds[i];
         
@@ -385,13 +411,28 @@ function updateGame(dt) {
             const s = bird.getObjectByName('shieldSphere');
             if (s) bird.remove(s);
 
+            // Tüm yol segmentlerini ve dekorasyonlarını temizle
             roadSegments.forEach(r => {
                 scene.remove(r.mesh);
                 scene.remove(r.left);
                 scene.remove(r.right);
+                scene.remove(r.lGround);
+                scene.remove(r.rGround);
+                // Dekorasyonları (ağaçlar, taşlar) temizle
+                if (r.decors) {
+                    r.decors.forEach(d => {
+                        if (d) scene.remove(d);
+                    });
+                }
+                // Geometri ve materyalleri dispose et
+                if (r.mesh.geometry) r.mesh.geometry.dispose();
+                if (r.mesh.material) r.mesh.material.dispose();
+                if (r.lGround && r.lGround.geometry) r.lGround.geometry.dispose();
+                if (r.rGround && r.rGround.geometry) r.rGround.geometry.dispose();
             });
             roadSegments = [];
             lastRoadZ = 0;
+            // Yeni segmentler oluştur (modeller yüklendikten sonra)
             for (let i = 0; i < 50; i++) createRoadSegment();
 
             bird.position.set(0, 0, 0);
