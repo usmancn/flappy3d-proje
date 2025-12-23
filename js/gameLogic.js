@@ -134,7 +134,7 @@ function updateGame(dt) {
             // LookAt de yolu takip etmeli
             camera.lookAt(targetLookAtX, 0, lookAtZ);
 
-            
+            // TEST MODU: Kuş ölmesin
             if (bird.position.y < -2) gameOver();
 
             if (lastRoadZ > bird.position.z - 100) {
@@ -277,7 +277,7 @@ function updateGame(dt) {
                     // Maksimum skor 30'a ulaştığında oyunu bitir
                      if (score >= 30) {
                          gameOver();
-                    }
+                     }
                 }
 
                 if (Math.abs(p.z - bird.position.z) < 1.0) {
@@ -287,14 +287,16 @@ function updateGame(dt) {
                         const dx = Math.abs(currentBirdOffset - p.offset);
 
                         if (dx > corridorHalfWidth) {
-                            
-                            gameOver();
+                            // TEST MODU: Kuş ölmesin
+                             gameOver();
                         } else {
                             const gapTop = p.yCenter + PIPE_GAP_Y / 2;
                             const gapBottom = p.yCenter - PIPE_GAP_Y / 2;
                             const hitY = (bird.position.y + 0.4 > gapTop) || (bird.position.y - 0.4 < gapBottom);
-                            
+                            // TEST MODU: Kuş ölmesin
+
                             if (hitY) gameOver();
+
                         }
                     }
                 }

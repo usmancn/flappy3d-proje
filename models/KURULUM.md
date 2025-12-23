@@ -32,3 +32,4 @@
 ## Not
 Eğer model GLB/GLTF formatında değilse, Blender veya online converter kullanarak dönüştürebilirsiniz.
 
+
