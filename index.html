@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Flappy - Platform Optimize</title>
+
+    <!-- Harici CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Kütüphaneler (aynen bıraktım) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <!-- START SCREEN -->
+    <div id="start-screen">
+        <h1 class="game-title">3D FLAPPY BIRD</h1>
+
+        <!-- Kaza Score Display (shown after crash) -->
+        <div id="kaza-score-display" class="hidden">
+            <h2 style="color: #e74c3c; font-size: 48px; margin: 0;">KAZA!</h2>
+            <p style="font-size: 32px; color: white; margin: 10px 0;">
+                Son Skor: <span id="kaza-final-score">0</span>
+            </p>
+        </div>
+
+        <div id="start-area" class="interaction-zone">
+            <div class="zone-icon"></div>
+            <p>BAŞLAMAK İÇİN BURADAYIM</p>
+            <p style="font-size: 14px; opacity: 0.8">(İmleci Getir ve Bekle)</p>
+        </div>
+
+        <!-- How to Play Button -->
+        <button id="how-to-play-btn" class="settings-btn how-to-play-btn">❓ Nasıl Oynanır</button>
+
+        <!-- Settings Toggle Button - Below start area -->
+        <button id="settings-toggle-btn" class="settings-btn">⚙ Ayarlar</button>
+
+        <div class="control-toggle">
+            <span id="control-label">MOD: KAMERA</span>
+            <label class="switch">
+                <input type="checkbox" id="camera-toggle" checked>
+                <span class="slider round"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- HOW TO PLAY MODAL -->
+    <div id="how-to-play-modal" class="modal-overlay hidden">
+        <div class="modal-content tutorial-modal">
+            <button id="close-tutorial-btn" class="modal-close-btn">✕</button>
+            <h2 class="tutorial-title">🎮 NASIL OYNANIR</h2>
+
+            <div class="tutorial-sections">
+                <!-- Section 1: Temel Kontroller -->
+                <div class="tutorial-section">
+                    <div class="tutorial-icon">👌</div>
+                    <h3>Zıplama</h3>
+                    <p>Sağ elinizle <strong>pinch</strong> (başparmak + işaret parmağı) yaparak kuşu zıplatın</p>
+                </div>
+
+                <!-- Section 2: Hareket -->
+                <div class="tutorial-section">
+                    <div class="tutorial-icon">👆</div>
+                    <h3>Hareket</h3>
+                    <p>İşaret parmağınızı <strong>sola/sağa</strong> hareket ettirerek kuşu yönlendirin</p>
+                </div>
+
+                <!-- Section 3: Duraklat -->
+                <div class="tutorial-section">
+                    <div class="tutorial-icon">✊</div>
+                    <h3>Duraklat</h3>
+                    <p>Sol elinizi <strong>yumruk</strong> yaparak oyunu duraklatın</p>
+                </div>
+
+                <!-- Section 4: Devam Et -->
+                <div class="tutorial-section">
+                    <div class="tutorial-icon">🖐️</div>
+                    <h3>Devam Et</h3>
+                    <p>Sol elinizi <strong>açık tutun</strong> (2sn) veya sağ pinch tutun</p>
+                </div>
+
+                <!-- Section 5: Power-ups -->
+                <div class="tutorial-section">
+                    <div class="tutorial-icon">⚡</div>
+                    <h3>Güçler</h3>
+                    <p><span class="power-shield">🛡️ Kalkan</span> çarpışmadan korur, <span class="power-breaker">💥
+                            Duvar Kırıcı</span> duvarları yok eder</p>
+                </div>
+
+                <!-- Section 6: Hedef -->
+                <div class="tutorial-section">
+                    <div class="tutorial-icon">🏆</div>
+                    <h3>Hedef</h3>
+                    <p>Engellerden kaçının ve <strong>30 puana</strong> ulaşarak kazanın!</p>
+                </div>
+            </div>
+
+            <div class="tutorial-footer">
+                <p>💡 <em>İpucu: Ayarlar menüsünden yerçekimi, hız ve zıplama gücünü değiştirebilirsiniz!</em></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD (In-Game) -->
+    <div id="hud">
+        <div class="score-container">
+            <div class="score-box">
+                <span class="score-label">SKOR</span>
+                <span id="scoreVal">0</span>
+            </div>
+            <div class="score-box small">
+                <span class="score-label">EN YÜKSEK</span>
+                <span id="maxScoreVal">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS PANEL -->
+    <div id="settings-panel">
+        <h3>AYARLAR</h3>
+
+        <div class="setting-item">
+            <label>Yerçekimi: <span id="gravVal">18.5</span></label>
+            <input type="range" id="gravRange" min="10" max="30" step="0.5" value="18.5">
+        </div>
+
+        <div class="setting-item">
+            <label>Oyun Hızı: <span id="speedVal">7.0</span></label>
+            <input type="range" id="speedRange" min="3" max="15" step="0.5" value="7.0">
+        </div>
+
+        <div class="setting-item">
+            <label>Zıplama Gücü: <span id="jumpVal">12.0</span></label>
+            <input type="range" id="jumpRange" min="8" max="20" step="0.5" value="12.0">
+        </div>
+
+        <button id="resetSettingsBtn" class="small-btn">Sıfırla</button>
+    </div>
+
+    <!-- Eski Info div'ini kaldırdık -->
+
+
+    <div id="game-cursor"></div>
+    <div id="status-display"></div>
+
+    <div id="gameOverScreen">
+        <h1 style="font-size: 60px; margin: 0; color: #e74c3c;">KAZA!</h1>
+        <p style="font-size: 30px;">Skorun: <span id="finalScore">0</span></p>
+
+        <div class="control-toggle" style="margin: 20px auto 0 auto; max-width: 300px;">
+            <span id="control-label-over">MOD: KAMERA</span>
+            <label class="switch">
+                <input type="checkbox" id="camera-toggle-over" checked>
+                <span class="slider round"></span>
+            </label>
+        </div>
+    </div>
+
+    <div id="control-layer">
+        <canvas id="output_canvas" width="320" height="240"></canvas>
+    </div>
+    <video id="webcam" playsinline></video>
+
+    <div id="game-container"></div>
+
+    <!-- PAUSE OVERLAY -->
+    <div id="pause-overlay" class="hidden">
+        <div class="pause-title">⏸ DURAKLATILDI</div>
+        <div class="pause-instructions">
+            🖐️ Sol eli aç (2sn) veya 👌 Sağ pinch tut
+        </div>
+        <div id="resume-progress-bar">
+            <div id="resume-progress-fill"></div>
+        </div>
+    </div>
+
+    <!-- SLOW MOTION OVERLAY -->
+    <div id="slowmo-overlay" class="hidden">
+        <div class="slowmo-title">🐢 YAVAŞ BAŞLANGIÇ</div>
+        <div id="slowmo-bar">
+            <div id="slowmo-progress"></div>
+        </div>
+    </div>
+
+    <!-- Settings Panel Toggle Logic -->
+    <script>
+        // Settings panel toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            const settingsToggleBtn = document.getElementById('settings-toggle-btn');
+            const settingsPanel = document.getElementById('settings-panel');
+
+            // Initialize as hidden
+            settingsPanel.classList.add('hidden');
+            settingsPanel.classList.remove('visible');
+
+            // Toggle button click
+            settingsToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                settingsPanel.classList.toggle('hidden');
+                settingsPanel.classList.toggle('visible');
+            });
+
+            // Click outside to close
+            document.addEventListener('click', (e) => {
+                if (!settingsPanel.contains(e.target) && e.target !== settingsToggleBtn) {
+                    settingsPanel.classList.add('hidden');
+                    settingsPanel.classList.remove('visible');
+                }
+            });
+
+            // Prevent clicks inside panel from closing it
+            settingsPanel.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // --- HOW TO PLAY MODAL ---
+            const howToPlayBtn = document.getElementById('how-to-play-btn');
+            const tutorialModal = document.getElementById('how-to-play-modal');
+            const closeTutorialBtn = document.getElementById('close-tutorial-btn');
+
+            // Open tutorial modal
+            howToPlayBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tutorialModal.classList.remove('hidden');
+            });
+
+            // Close tutorial modal
+            closeTutorialBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tutorialModal.classList.add('hidden');
+            });
+
+            // Click outside modal to close
+            tutorialModal.addEventListener('click', (e) => {
+                if (e.target === tutorialModal) {
+                    tutorialModal.classList.add('hidden');
+                }
+            });
+
+            // Prevent clicks inside modal from closing it
+            const modalContent = tutorialModal.querySelector('.tutorial-modal');
+            if (modalContent) {
+                modalContent.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+        });
+    </script>
+
+    <!-- Tüm oyun kodun buraya taşındı -->
+    <script src="js/ab-test-config.js"></script>
+    <script src="js/globals.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/gameLogic.js"></script>
+    <script src="js/input.js"></script>
+
+    <script src="js/restart-test.js"></script> <!-- Automated restart stress testing -->
+    <script src="js/loop.js"></script>
+    <script src="js/boot.js"></script>
+
+</body>
+
+</html>

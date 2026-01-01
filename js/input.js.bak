@@ -1,0 +1,474 @@
+// --- MOUSE INPUT ---
+let mouseX = 0;
+let mouseY = 0;
+
+function setupInput() {
+    // Mouse hareketi
+    // Mouse hareketi
+    window.addEventListener('mousemove', (e) => {
+        // useCamera olsa bile mouse takibi yapmalıyız (UI etkileşimi için)
+        // Ancak oyun kontrolü "useCamera" true ise kameradan gelir.
+        // Yine de mouseX/Y güncellenmeli.
+
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+
+        // Eğer kamera modu kapalıysa veya oyun aktif değilse (menüdeysek) cursor'ı güncelle
+        if (!useCamera || !gameActive) {
+            updateCursor(mouseX, mouseY);
+        }
+    });
+
+    // Mouse tıklaması (Zıplama)
+    // Mouse tıklaması (Zıplama)
+    window.addEventListener('mousedown', () => {
+        // CAMERA TOGGLE LOGIC (Mouse mode)
+        if (isHoveringCameraToggle && !gameActive) {
+            const mainToggle = document.getElementById('camera-toggle');
+            const overToggle = document.getElementById('camera-toggle-over');
+            // Toggle the camera mode
+            const newState = !mainToggle.checked;
+            mainToggle.checked = newState;
+            if (overToggle) overToggle.checked = newState;
+            setCameraToggleState(newState);
+            useCamera = newState;
+            return; // Don't process other clicks
+        }
+
+        // NORMAL GAMEPLAY JUMP
+        if (gameActive) {
+            jump();
+        }
+    });
+
+    // Klavye Space (Zıplama) - Her iki modda da çalışsın
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && gameActive) {
+            jump();
+        }
+    });
+
+    // Kamera Toggle
+    // Hem menü hem HUD'daki kamera anahtarlarını eşzamanlı kullan
+    const mainToggle = document.getElementById('camera-toggle');
+    const overToggle = document.getElementById('camera-toggle-over');
+
+    // Menüdeki toggle
+    mainToggle.addEventListener('change', (e) => {
+        if (overToggle) overToggle.checked = mainToggle.checked;
+        setCameraToggleState(mainToggle.checked);
+    });
+    // Game over ekranındaki toggle
+    if (overToggle) {
+        overToggle.addEventListener('change', (e) => {
+            mainToggle.checked = overToggle.checked;
+            setCameraToggleState(overToggle.checked);
+        });
+        // Varsayılan senkronizasyon
+        overToggle.checked = mainToggle.checked;
+    }
+    setCameraToggleState(mainToggle.checked);
+
+}
+
+// Ortak fonksiyon - Global scope for pinch gesture access
+function setCameraToggleState(checked) {
+    const videoEl = document.getElementById('control-layer');
+    const labelMenu = document.getElementById('control-label');
+    const labelOver = document.getElementById('control-label-over');
+
+    // Update preview visibility (not tracking state)
+    showCameraPreview = checked;
+
+    if (checked) {
+        videoEl.classList.remove('hidden');
+        if (labelMenu) labelMenu.innerText = "MOD: KAMERA";
+        if (labelOver) labelOver.innerText = "MOD: KAMERA";
+    } else {
+        videoEl.classList.add('hidden');
+        if (labelMenu) labelMenu.innerText = "KAMERA GİZLİ (El izleme aktif)";
+        if (labelOver) labelOver.innerText = "KAMERA GİZLİ (El izleme aktif)";
+    }
+
+    // Keep hand tracking always enabled
+    useCamera = true;
+}
+
+function updateCursor(x, y) {
+    const cursorEl = document.getElementById('game-cursor');
+    cursorEl.style.left = x + 'px';
+    cursorEl.style.top = y + 'px';
+    cursorEl.style.display = 'block';
+
+    // OYUN INPUT HESAPLAMA
+    // Ekranın ortası 0, solu -1, sağı +1 gibi düşünelim
+    const normalizedX = x / window.innerWidth;
+
+    // Input Input Saturation (Mouse için de geçerli)
+    const INPUT_RANGE = 22.0;
+    targetBirdX = (normalizedX - 0.5) * (INPUT_RANGE * 2);
+
+    // --- START SCREEN HOVER LOGIC ---
+    checkStartHover(x, y);
+
+    // --- CAMERA TOGGLE HOVER LOGIC ---
+    checkCameraToggleHover(x, y);
+
+    // --- SETTINGS BUTTON HOVER LOGIC ---
+    checkSettingsButtonHover(x, y);
+}
+
+function checkStartHover(x, y) {
+    const startZone = document.getElementById('start-area');
+    if (!startZone || gameActive) return;
+
+    // Don't allow start hover if settings panel is open
+    const settingsPanel = document.getElementById('settings-panel');
+    const isSettingsOpen = settingsPanel && settingsPanel.classList.contains('visible');
+    if (isSettingsOpen) {
+        // Reset hover state if settings opened while hovering
+        if (isHoveringStart) {
+            isHoveringStart = false;
+            startZone.classList.remove('hovered');
+            startZone.classList.remove('charging');
+        }
+        return;
+    }
+
+    const rect = startZone.getBoundingClientRect();
+    const isInside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+
+    if (isInside) {
+        if (!isHoveringStart) {
+            isHoveringStart = true;
+            hoverStartTime = Date.now();
+            startZone.classList.add('hovered');
+            startZone.classList.add('charging'); // CSS animasyonu başlat
+        } else {
+            // Bekleme süresini kontrol et
+            const elapsed = Date.now() - hoverStartTime;
+            if (elapsed > HOVER_REQUIRED_TIME) {
+                startGame();
+                isHoveringStart = false;
+                startZone.classList.remove('hovered');
+                startZone.classList.remove('charging');
+            }
+        }
+    } else {
+        // Tolerans: Hemen resetleme, belki kullanıcı yanlışlıkla çıktı
+        // Basit tutmak için şimdilik direkt resetliyoruz ama ileride 100ms grace period eklenebilir.
+        isHoveringStart = false;
+        startZone.classList.remove('hovered');
+        startZone.classList.remove('charging');
+    }
+}
+
+function checkCameraToggleHover(x, y) {
+    // Check both start screen and crash screen camera toggles
+    const toggles = document.querySelectorAll('.control-toggle');
+    let isOverAnyToggle = false;
+
+    toggles.forEach(toggle => {
+        const rect = toggle.getBoundingClientRect();
+        const isInside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+
+        if (isInside) {
+            isOverAnyToggle = true;
+            if (!isHoveringCameraToggle) {
+                toggle.classList.add('hovered');
+            }
+        } else {
+            toggle.classList.remove('hovered');
+        }
+    });
+
+    isHoveringCameraToggle = isOverAnyToggle;
+}
+
+function checkSettingsButtonHover(x, y) {
+    const settingsBtn = document.getElementById('settings-toggle-btn');
+    if (!settingsBtn) return;
+
+    const rect = settingsBtn.getBoundingClientRect();
+    const isInside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+
+    if (isInside) {
+        if (!isHoveringSettingsButton) {
+            settingsBtn.classList.add('hovered');
+        }
+        isHoveringSettingsButton = true;
+    } else {
+        settingsBtn.classList.remove('hovered');
+        isHoveringSettingsButton = false;
+    }
+}
+
+
+window.setupMediaPipe = function () {
+    setupInput(); // Mouse inputları hazırla
+
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    hands.setOptions({
+        maxNumHands: 2,  // Detect BOTH hands simultaneously
+        modelComplexity: 1, // Performans için 0 yapılabilir
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    hands.onResults((results) => {
+        // Hand tracking always runs (even if preview is hidden)
+        // Only control canvas drawing based on showCameraPreview
+
+        if (showCameraPreview) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            // Draw camera preview
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.restore();
+        }
+
+        // Process all detected hands
+        if (results.multiHandLandmarks && results.multiHandedness) {
+            for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                const landmarks = results.multiHandLandmarks[i];
+                const handedness = results.multiHandedness[i];
+                // NOTE: Camera is mirrored! "Left" in camera = User's RIGHT hand
+                const isUserLeftHand = handedness.label === "Right";  // User's LEFT hand shows as "Right" in camera
+
+                // Draw hand landmarks (keypoints) for both hands
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+                    color: '#00FFFF',  // Cyan for all hands
+                    lineWidth: 2
+                });
+                drawLandmarks(canvasCtx, landmarks, {
+                    color: '#00FFFF',  // Cyan for all hands
+                    lineWidth: 1,
+                    radius: 4,
+                    fillColor: '#00FFFF'
+                });
+
+                if (isUserLeftHand) {
+                    // USER'S LEFT HAND - PAUSE/RESUME CONTROL
+                    // Detect fist: fingers closed (all fingertips below palm base)
+                    const palmBase = landmarks[0]; // Wrist
+                    const fingertips = [
+                        landmarks[4],  // Thumb
+                        landmarks[8],  // Index
+                        landmarks[12], // Middle
+                        landmarks[16], // Ring
+                        landmarks[20]  // Pinky
+                    ];
+
+                    // Fist detection: all fingers curled
+                    const isFist = fingertips.every(tip => tip.y > palmBase.y + 0.1);
+
+                    // Open hand detection: all fingers extended
+                    const isOpenHand = fingertips.every(tip => tip.y < palmBase.y);
+
+                    // Pinch detection for quick resume
+                    const leftPinchDist = Math.sqrt(
+                        Math.pow(landmarks[4].x - landmarks[8].x, 2) +
+                        Math.pow(landmarks[4].y - landmarks[8].y, 2)
+                    );
+                    const isLeftPinching = leftPinchDist < PINCH_THRESHOLD;
+
+                    if (isFist && gameActive && !isGamePaused) {
+                        pauseGame();
+                        console.log('LEFT FIST - Game paused');
+                    } else if (isGamePaused) {
+                        // Quick resume: pinch
+                        if (isLeftPinching) {
+                            resumeGame();
+                            console.log('LEFT PINCH - Quick resume');
+                        }
+                        // Slow resume: open hand 2s
+                        else if (isOpenHand) {
+                            // Start timer for resume
+                            if (!leftHandOpen) {
+                                leftHandOpen = true;
+                                openHandStartTime = Date.now();
+                            }
+
+                            const elapsed = Date.now() - openHandStartTime;
+                            const progress = Math.min(100, (elapsed / OPEN_HAND_RESUME_TIME) * 100);
+
+                            // Update progress bar
+                            const progressFill = document.getElementById('resume-progress-fill');
+                            if (progressFill) {
+                                progressFill.style.width = progress + '%';
+                            }
+
+                            if (elapsed >= OPEN_HAND_RESUME_TIME) {
+                                resumeGame();
+                                console.log('LEFT OPEN - Resume after 2s');
+                            }
+                            else {
+                                leftHandOpen = false;
+                                openHandStartTime = 0;
+                                const progressFill = document.getElementById('resume-progress-fill');
+                                if (progressFill) {
+                                    progressFill.style.width = '0%';
+                                }
+                            }
+                        }
+                    } else {
+                        // USER'S RIGHT HAND - GAME CONTROL
+                        const screenX = (1 - landmarks[8].x) * window.innerWidth;
+                        const screenY = landmarks[8].y * window.innerHeight;
+
+                        // Cursor güncelleme ve Start kontrolü tek fonksiyonda
+                        updateCursor(screenX, screenY);
+
+                        // SLIDER CONTROL WITH PINCH
+                        const settingsPanel = document.getElementById('settings-panel');
+                        const isPanelOpen = settingsPanel && settingsPanel.classList.contains('visible');
+
+                        if (isPanelOpen) {
+                            // Get all sliders
+                            const sliders = document.querySelectorAll('#settings-panel input[type="range"]');
+                            let hoveringSlider = null;
+
+                            // Check if cursor is over any slider
+                            sliders.forEach(slider => {
+                                const rect = slider.getBoundingClientRect();
+                                if (screenX >= rect.left && screenX <= rect.right &&
+                                    screenY >= rect.top && screenY <= rect.bottom) {
+                                    hoveringSlider = slider;
+                                }
+                            });
+
+                            // Handle slider pinch control
+                            const dist = Math.sqrt(
+                                Math.pow(landmarks[4].x - landmarks[8].x, 2) +
+                                Math.pow(landmarks[4].y - landmarks[8].y, 2)
+                            );
+                            const isCurrentPinch = dist < PINCH_THRESHOLD;
+
+                            if (isCurrentPinch && hoveringSlider && !activeSlider) {
+                                // Start grabbing slider
+                                activeSlider = hoveringSlider;
+                                sliderStartValue = parseFloat(activeSlider.value);
+                                sliderStartX = landmarks[8].x;
+                            } else if (!isCurrentPinch && activeSlider) {
+                                // Release slider
+                                activeSlider = null;
+                            }
+
+                            // Adjust slider value if grabbed
+                            if (activeSlider && isCurrentPinch) {
+                                const currentX = landmarks[8].x;
+                                const deltaX = currentX - sliderStartX;
+
+                                const min = parseFloat(activeSlider.min);
+                                const max = parseFloat(activeSlider.max);
+                                const range = max - min;
+
+                                // Map hand movement to slider range (adjust sensitivity)
+                                const sensitivity = range * 2; // Adjust this for more/less sensitivity
+                                let newValue = sliderStartValue + (deltaX * sensitivity);
+
+                                // Clamp to min/max
+                                newValue = Math.max(min, Math.min(max, newValue));
+
+                                // Update slider
+                                activeSlider.value = newValue;
+
+                                // Trigger change event to update display
+                                activeSlider.dispatchEvent(new Event('input'));
+                            }
+                        }
+
+                        // PINCH (ZIPLAMA)
+                        const dist = Math.sqrt(
+                            Math.pow(landmarks[4].x - landmarks[8].x, 2) +
+                            Math.pow(landmarks[4].y - landmarks[8].y, 2)
+                        );
+                        const isCurrentPinch = dist < PINCH_THRESHOLD;
+
+                        if (isCurrentPinch) {
+                            const now = Date.now();
+                            if (!isPinching && now - lastPinchTime > PINCH_COOLDOWN) {
+                                const settingsPanel = document.getElementById('settings-panel');
+                                const isPanelOpen = settingsPanel && settingsPanel.classList.contains('visible');
+                                const settingsBtn = document.getElementById('settings-toggle-btn');
+
+                                // Check if pinching on settings button area
+                                const isPinchingOnSettings = settingsBtn && isHoveringSettingsButton;
+
+                                // Check if cursor is inside settings panel
+                                let isPinchingInsidePanel = false;
+                                if (isPanelOpen && settingsPanel) {
+                                    const panelRect = settingsPanel.getBoundingClientRect();
+                                    const cursorEl = document.getElementById('game-cursor');
+                                    if (cursorEl) {
+                                        const cursorRect = cursorEl.getBoundingClientRect();
+                                        const cursorX = cursorRect.left + cursorRect.width / 2;
+                                        const cursorY = cursorRect.top + cursorRect.height / 2;
+                                        isPinchingInsidePanel = cursorX >= panelRect.left && cursorX <= panelRect.right &&
+                                            cursorY >= panelRect.top && cursorY <= panelRect.bottom;
+                                    }
+                                }
+
+                                // SETTINGS BUTTON TOGGLE (Pinch gesture - no hover required, just pinch anywhere on button)
+                                if (isPinchingOnSettings && !gameActive) {
+                                    if (settingsPanel) {
+                                        settingsPanel.classList.toggle('hidden');
+                                        settingsPanel.classList.toggle('visible');
+                                    }
+                                }
+                                // CLOSE SETTINGS IF OPEN AND PINCH OUTSIDE (not inside panel, not on settings button)
+                                else if (isPanelOpen && !gameActive && !isPinchingOnSettings && !isPinchingInsidePanel) {
+                                    // Close panel only if pinching outside of it
+                                    settingsPanel.classList.add('hidden');
+                                    settingsPanel.classList.remove('visible');
+                                }
+                                // CAMERA TOGGLE LOGIC (Pinch gesture) - works when game not active
+                                else if (isHoveringCameraToggle && !gameActive && !isPanelOpen) {
+                                    const mainToggle = document.getElementById('camera-toggle');
+                                    const overToggle = document.getElementById('camera-toggle-over');
+                                    // Toggle the camera mode
+                                    const newState = !mainToggle.checked;
+                                    mainToggle.checked = newState;
+                                    if (overToggle) overToggle.checked = newState;
+                                    setCameraToggleState(newState);
+                                }
+                                // NORMAL GAMEPLAY JUMP - only works when game is active
+                                else if (gameActive) {
+                                    jump();
+                                }
+                                // If game not active and not hovering camera toggle, do nothing
+                                // Game start is handled by hover timer in checkStartHover()
+
+                                lastPinchTime = now;
+                                isPinching = true;
+                            }
+                            // Görsel geri bildirim
+                            const cursorEl = document.getElementById('game-cursor');
+                            cursorEl.style.backgroundColor = '#00FF00';
+                            cursorEl.style.boxShadow = '0 0 15px #00FF00';
+                        } else {
+                            isPinching = false;
+                            const cursorEl = document.getElementById('game-cursor');
+                            cursorEl.style.backgroundColor = 'transparent';
+                            cursorEl.style.boxShadow = '0 0 10px #00FFFF, inset 0 0 10px #00FFFF';
+                        }
+                    } // End of RIGHT HAND pinch logic
+                } // End of for loop (each hand)
+            }); // End of hands.onResults
+
+    const cameraUtils = new Camera(videoElement, {
+        onFrame: async () => {
+            // Always send frames to hand tracking (even if preview is hidden)
+            await hands.send({ image: videoElement });
+        },
+        width: CAMERA_WIDTH,
+        height: CAMERA_HEIGHT
+    });
+    cameraUtils.start();
+}
